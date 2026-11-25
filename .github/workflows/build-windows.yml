@@ -1,0 +1,64 @@
+name: Build Windows EXE with Firefox
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Install Firefox into bundle folder
+        shell: pwsh
+        run: |
+          $browserPath = Join-Path $env:GITHUB_WORKSPACE "pw-browsers"
+          New-Item -ItemType Directory -Force -Path $browserPath | Out-Null
+          "PLAYWRIGHT_BROWSERS_PATH=$browserPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          python -m playwright install firefox
+
+      - name: Build application
+        run: |
+          pyinstaller --noconfirm --clean --onedir --windowed --name KavirTireBot --collect-all playwright kavir_tire_bot_firefox.py
+
+      - name: Include Firefox browser
+        shell: pwsh
+        run: |
+          Copy-Item -Path "pw-browsers" -Destination "dist/KavirTireBot/pw-browsers" -Recurse -Force
+
+      - name: Add user instructions
+        shell: pwsh
+        run: |
+          @"
+          ربات پایش موجودی کویر تایر - نسخه مستقل ویندوز
+
+          روش اجرا:
+          1) فایل ZIP خروجی را کامل Extract کنید.
+          2) وارد پوشه KavirTireBot شوید.
+          3) روی KavirTireBot.exe دوبار کلیک کنید.
+
+          نیاز به نصب Python، Playwright یا Firefox جداگانه نیست.
+          Firefox موردنیاز برنامه داخل پوشه pw-browsers قرار دارد.
+          ورود به حساب و تکمیل خرید همچنان توسط کاربر انجام می‌شود.
+          "@ | Set-Content -Path "dist/KavirTireBot/راهنمای اجرا.txt" -Encoding UTF8
+
+      - name: Upload ready-to-run package
+        uses: actions/upload-artifact@v4
+        with:
+          name: KavirTireBot-Windows-EXE
+          path: dist/KavirTireBot/
+          if-no-files-found: error
+          compression-level: 6
